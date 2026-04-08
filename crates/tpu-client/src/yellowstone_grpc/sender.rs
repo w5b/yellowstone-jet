@@ -747,6 +747,58 @@ pub async fn create_yellowstone_tpu_sender_with_clients<CB>(
 where
     CB: TpuSenderResponseCallback,
 {
+    let YellowstoneSlotTrackerOk {
+        atomic_slot_tracker,
+        join_handle: slot_tracker_jh,
+    } = slot_tracker::atomic_slot_tracker(grpc_client)
+        .await?
+        .ok_or(CreateTpuSenderError::GeyserSubscriptionEnded)?;
+
+    tracing::debug!("spawned slot tracker service");
+
+    create_yellowstone_tpu_sender_from_slot_tracker(
+        config,
+        initial_identity,
+        rpc_client,
+        atomic_slot_tracker,
+        callback,
+        Some(slot_tracker_jh),
+    )
+    .await
+}
+
+pub async fn create_yellowstone_tpu_sender_with_external_slot_tracker<CB>(
+    config: YellowstoneTpuSenderConfig,
+    initial_identity: Keypair,
+    rpc_client: Arc<rpc_client::RpcClient>,
+    atomic_slot_tracker: Arc<AtomicSlotTracker>,
+    callback: Option<CB>,
+) -> Result<NewYellowstoneTpuSender, CreateTpuSenderError>
+where
+    CB: TpuSenderResponseCallback,
+{
+    create_yellowstone_tpu_sender_from_slot_tracker(
+        config,
+        initial_identity,
+        rpc_client,
+        atomic_slot_tracker,
+        callback,
+        None,
+    )
+    .await
+}
+
+async fn create_yellowstone_tpu_sender_from_slot_tracker<CB>(
+    config: YellowstoneTpuSenderConfig,
+    initial_identity: Keypair,
+    rpc_client: Arc<rpc_client::RpcClient>,
+    atomic_slot_tracker: Arc<AtomicSlotTracker>,
+    callback: Option<CB>,
+    slot_tracker_jh: Option<tokio::task::JoinHandle<()>>,
+) -> Result<NewYellowstoneTpuSender, CreateTpuSenderError>
+where
+    CB: TpuSenderResponseCallback,
+{
     let (tpu_info_service, tpu_info_service_jh) =
         rpc_cluster_tpu_info_service(Arc::clone(&rpc_client), config.tpu_info).await?;
 
@@ -764,16 +816,6 @@ where
 
     tracing::debug!("spawned stake info service");
 
-    let YellowstoneSlotTrackerOk {
-        atomic_slot_tracker,
-        join_handle: slot_tracker_jh,
-    } = slot_tracker::atomic_slot_tracker(grpc_client)
-        .await?
-        .ok_or(CreateTpuSenderError::GeyserSubscriptionEnded)?;
-
-    tracing::debug!("spawned slot tracker service");
-
-    // TODO: make it configurable in another release
     let connection_eviction_strategy = StakeBasedEvictionStrategy {
         ..Default::default()
     };
@@ -782,9 +824,11 @@ where
         slot_tracker: Arc::clone(&atomic_slot_tracker),
         managed_schedule: managed_leader_schedule.clone(),
     };
+
     let tpu_port_kind = config.tpu.tpu_port;
     let tpu_info_service: Arc<dyn crate::core::LeaderTpuInfoService + Send + Sync> =
         Arc::new(tpu_info_service);
+
     let base_tpu_sender = create_base_tpu_client(
         config.tpu,
         initial_identity,
@@ -808,18 +852,21 @@ where
         tpu_port_kind,
     };
 
-    let handles = vec![
+    let mut handles = vec![
         tpu_info_service_jh,
         managed_leader_schedule_jh,
         stake_info_jh,
-        slot_tracker_jh,
     ];
-    let handle_name_vec = vec![
+    let mut handle_name_vec = vec![
         "tpu-info-service",
         "managed-leader-schedule",
         "stake-info-service",
-        "slot-tracker",
     ];
+
+    if let Some(slot_tracker_jh) = slot_tracker_jh {
+        handles.push(slot_tracker_jh);
+        handle_name_vec.push("slot-tracker");
+    }
 
     Ok(NewYellowstoneTpuSender {
         sender,
