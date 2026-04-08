@@ -1,4 +1,4 @@
-use std::sync::atomic::{AtomicBool, AtomicU64};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 ///
 /// An atomic slot tracker that can be shared across tasks.
