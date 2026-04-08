@@ -12,7 +12,6 @@ use std::sync::atomic::{AtomicBool, AtomicU64};
 /// The slot tracker can be poisoned if the background task updating it panics or is dropped.
 ///
 ///
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 pub struct AtomicSlotTracker {
     pub(crate) slot: AtomicU64,
