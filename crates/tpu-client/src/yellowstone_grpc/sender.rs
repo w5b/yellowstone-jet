@@ -469,7 +469,7 @@ impl YellowstoneTpuSender {
     ///
     /// If `dests` is empty, the function returns `Ok(())` immediately
     ///
-    pub async fn send_txn_many_dest<T>(
+    pub fn send_txn_many_dest<T>(
         &mut self,
         sig: Signature,
         txn: T,
@@ -524,7 +524,7 @@ impl YellowstoneTpuSender {
     ///
     /// The fanout succeed if the sender can schedule at least one send to a leader.
     ///
-    async fn send_txn_fanout_with_blocklist<T, B>(
+    fn send_txn_fanout_with_blocklist<T, B>(
         &mut self,
         sig: Signature,
         txn: T,
@@ -583,7 +583,7 @@ impl YellowstoneTpuSender {
                         txn: wire_txn,
                     })
                 } else {
-                    self.send_txn_many_dest(sig, wire_txn, &leaders).await
+                    self.send_txn_many_dest(sig, wire_txn, &leaders)
                 }
             }
             Err(err_kind) => Err(SendError {
@@ -627,12 +627,11 @@ impl YellowstoneTpuSender {
     /// `Ok(())` if the transaction was sent successfully, or a `SendError` if there was an error.
     ///
     ///
-    pub async fn send_txn<T>(&mut self, sig: Signature, txn: T) -> Result<(), SendError>
+    pub fn send_txn<T>(&mut self, sig: Signature, txn: T) -> Result<(), SendError>
     where
         T: AsRef<[u8]> + Send + 'static,
     {
         self.send_txn_with_blocklist(sig, txn, Some(NoBlocklist))
-            .await
     }
 
     ///
@@ -649,7 +648,7 @@ impl YellowstoneTpuSender {
     /// `Ok(())` if the transaction was sent successfully, or a `SendError` if there was an error.
     ///
     ///
-    pub async fn send_txn_with_blocklist<T, B>(
+    pub fn send_txn_with_blocklist<T, B>(
         &mut self,
         sig: Signature,
         txn: T,
@@ -660,7 +659,6 @@ impl YellowstoneTpuSender {
         B: Blocklist,
     {
         self.send_txn_fanout_with_blocklist(sig, txn, blocklist)
-            .await
     }
 
     #[cfg_attr(
@@ -679,7 +677,7 @@ impl YellowstoneTpuSender {
     ///
     ///  # Returns
     ///  `Ok(())` if the transaction was sent successfully, or a `SendError` if there was an error.
-    pub async fn send_txn_with_shield_policies<T>(
+    pub fn send_txn_with_shield_policies<T>(
         &mut self,
         sig: Signature,
         txn: T,
@@ -689,7 +687,6 @@ impl YellowstoneTpuSender {
         T: AsRef<[u8]> + Send + 'static,
     {
         self.send_txn_fanout_with_blocklist(sig, txn, Some(shield))
-            .await
     }
 
     ///
