@@ -35,10 +35,13 @@ impl TpuSender {
     ///
     /// Sends a transaction to the TPU sender task.
     ///
-    pub async fn send_txn(&mut self, txn: TpuSenderTxn) -> Result<(), TpuSenderError> {
+    pub fn send_txn(&mut self, txn: TpuSenderTxn) -> Result<(), TpuSenderError> {
         // I put &mut self here to indicate that the caller should not be sending txns concurrently from multiple tasks.
         // This is the be consistent with the rest of the API which uses &mut self for updating identity.
-        self.txn_tx.send(txn).await.map_err(|e| TpuSenderError(e.0))
+        self.txn_tx
+            .blocking_send(txn)
+            .map_err(|e| TpuSenderError(e.0))
+        //self.txn_tx.send(txn).await.map_err(|e| TpuSenderError(e.0))
     }
 
     ///

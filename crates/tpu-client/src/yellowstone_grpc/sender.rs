@@ -501,7 +501,7 @@ impl YellowstoneTpuSender {
                 remote_peer: *dest,
                 wire: wire_txn.clone(),
             };
-            if self.base_tpu_sender.send_txn(tpu_txn).await.is_err() {
+            if self.base_tpu_sender.send_txn(tpu_txn).is_err() {
                 return Err(SendError {
                     kind: SendErrorKind::Closed,
                     txn: wire_txn,
